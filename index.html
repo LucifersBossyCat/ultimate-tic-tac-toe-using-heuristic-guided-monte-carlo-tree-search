@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Celestial Tic‑Tac‑Toe · HG‑MCTS</title>
+  
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Google Fonts: Space Grotesk -->
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       Celestial Space Theme
+       ═══════════════════════════════════════════════════════ */
+    :root {
+      --bg-space: #050814;
+      --surface-glass: rgba(16, 22, 38, 0.7);
+      --border-glass: rgba(255, 255, 255, 0.1);
+      
+      --color-sun: #FFD700;      /* Golden Sun */
+      --color-moon: #87CEFA;     /* Silver/Blue Moon */
+      --color-draw: #A9A9A9;     /* Stardust Gray */
+      
+      --glow-sun: rgba(255, 215, 0, 0.5);
+      --glow-moon: rgba(135, 206, 250, 0.5);
+      
+      --font-main: 'Space Grotesk', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-space);
+      color: #fff;
+      font-family: var(--font-main);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* CSS Starfield Background */
+    .starfield {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: -2;
+      background-image: 
+        radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 40px 70px, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(1.5px 1.5px at 90px 40px, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(2px 2px at 160px 120px, #d4e4ff, rgba(0,0,0,0));
+      background-repeat: repeat;
+      background-size: 200px 200px;
+      animation: drift 100s linear infinite;
+    }
+
+    .nebula {
+      position: fixed;
+      top: 50%; left: 50%;
+      width: 80vw; height: 80vw;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(135, 206, 250, 0.03) 0%, rgba(255, 215, 0, 0.02) 40%, rgba(0,0,0,0) 70%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    @keyframes drift {
+      from { background-position: 0 0; }
+      to { background-position: -200px 200px; }
+    }
+
+    /* Glass UI Elements */
+    .glass-panel {
+      background: var(--surface-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    h1.title-glow {
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--color-sun), var(--color-moon));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+
+    /* Setup Options */
+    .symbol-option {
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid transparent;
+      border-radius: 12px;
+      padding: 1.5rem 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .symbol-option:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .symbol-option.active-sun {
+      border-color: var(--color-sun);
+      background: rgba(255, 215, 0, 0.1);
+      box-shadow: 0 0 20px var(--glow-sun);
+    }
+
+    .symbol-option.active-moon {
+      border-color: var(--color-moon);
+      background: rgba(135, 206, 250, 0.1);
+      box-shadow: 0 0 20px var(--glow-moon);
+    }
+
+    /* Form Controls */
+    .form-select-dark {
+      background-color: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border-glass);
+      color: #fff;
+    }
+    .form-select-dark:focus {
+      background-color: rgba(0, 0, 0, 0.6);
+      border-color: var(--color-moon);
+      box-shadow: 0 0 10px var(--glow-moon);
+      color: #fff;
+    }
+
+    .form-switch .form-check-input {
+      background-color: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    .form-switch .form-check-input:checked {
+      background-color: var(--color-sun);
+      border-color: var(--color-sun);
+      box-shadow: 0 0 10px var(--glow-sun);
+    }
+
+    /* Board & Grids */
+    .board-wrapper {
+      aspect-ratio: 1;
+      width: 100%;
+      max-width: 650px;
+      margin: 0 auto;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 20px;
+      border: 1px solid var(--border-glass);
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 10px;
+      height: 100%;
+    }
+
+    .small-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 3px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 5px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    /* Orbit Highlights */
+    .small-board.active-sun {
+      border-color: var(--color-sun);
+      box-shadow: 0 0 15px var(--glow-sun), inset 0 0 10px rgba(255, 215, 0, 0.1);
+    }
+    .small-board.active-moon {
+      border-color: var(--color-moon);
+      box-shadow: 0 0 15px var(--glow-moon), inset 0 0 10px rgba(135, 206, 250, 0.1);
+    }
+    .small-board.inactive {
+      opacity: 0.4;
+      filter: grayscale(0.5);
+    }
+
+    /* Macro Win Overlays */
+    .macro-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      z-index: 10;
+      backdrop-filter: blur(3px);
+      animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .macro-overlay.won-sun { background: rgba(255, 215, 0, 0.15); border: 2px solid var(--color-sun); }
+    .macro-overlay.won-moon { background: rgba(135, 206, 250, 0.15); border: 2px solid var(--color-moon); }
+    .macro-overlay.won-draw { background: rgba(169, 169, 169, 0.15); border: 2px solid var(--color-draw); }
+
+    /* Cells */
+    .cell {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .cell svg { width: 65%; height: 65%; animation: pop-in 0.3s ease; }
+    .cell.playable { cursor: pointer; }
+    .cell.playable:hover { background: rgba(255, 255, 255, 0.15); transform: scale(1.05); z-index: 5; }
+    .cell.playable.sun-hover:hover { box-shadow: 0 0 12px var(--glow-sun); border: 1px solid var(--color-sun); }
+    .cell.playable.moon-hover:hover { box-shadow: 0 0 12px var(--glow-moon); border: 1px solid var(--color-moon); }
+    .cell.last-move { border: 1px solid #fff; box-shadow: 0 0 10px rgba(255,255,255,0.4); }
+
+    @keyframes pop-in {
+      from { transform: scale(0.5); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    /* Sidebar Minimap */
+    .macro-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3px;
+      width: 100px;
+      margin: 0 auto;
+    }
+    .mini-cell {
+      aspect-ratio: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      border: 1px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mini-cell.sun-won { background: rgba(255, 215, 0, 0.3); border-color: var(--color-sun); }
+    .mini-cell.moon-won { background: rgba(135, 206, 250, 0.3); border-color: var(--color-moon); }
+    .mini-cell.draw-won { background: rgba(169, 169, 169, 0.3); }
+    .mini-cell.active-mini { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+
+    /* Buttons */
+    .btn-cosmic {
+      background: linear-gradient(45deg, #1e3a8a, #312e81);
+      color: #fff;
+      border: 1px solid var(--color-moon);
+      transition: all 0.3s;
+    }
+    .btn-cosmic:hover {
+      background: linear-gradient(45deg, #312e81, #1e3a8a);
+      color: #fff;
+      box-shadow: 0 0 15px var(--glow-moon);
+      transform: translateY(-2px);
+    }
+    
+    .btn-sun {
+      background: var(--color-sun);
+      color: #000;
+      font-weight: bold;
+    }
+    .btn-sun:hover { background: #e6c200; box-shadow: 0 0 15px var(--glow-sun); }
+
+    /* Custom Result Modal */
+    .result-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .result-overlay.show { opacity: 1; pointer-events: auto; }
+    .result-card {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-glass);
+      border-radius: 20px;
+      padding: 3rem 2rem;
+      text-align: center;
+      width: 90%; max-width: 400px;
+      transform: translateY(20px); transition: transform 0.3s;
+    }
+    .result-overlay.show .result-card { transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Background -->
+  <div class="starfield"></div>
+  <div class="nebula"></div>
+
+  <div class="container py-4 d-flex flex-column min-vh-100">
+    
+    <!-- Header -->
+    <header class="text-center mb-4">
+      <h1 class="title-glow">Celestial Tic‑Tac‑Toe</h1>
+      <p class="text-uppercase tracking-wider small text-light opacity-75">HG‑MCTS Engine</p>
+    </header>
+
+    <!-- 1. Setup Panel -->
+    <div id="setup-panel" class="row justify-content-center flex-grow-1 align-items-center">
+      <div class="col-12 col-md-6 col-lg-5">
+        <div class="glass-panel p-4">
+          <h4 class="text-center mb-4">Launch Coordinates</h4>
+          
+          <!-- Symbol Selector -->
+          <div class="mb-4">
+            <label class="form-label text-uppercase small text-light opacity-75">Select Celestial Body</label>
+            <div class="row g-3">
+              <div class="col-6">
+                <div class="symbol-option active-sun text-center" id="btn-sun" onclick="selectSymbol('X')">
+                  <div class="mb-2" id="icon-sun-select"></div>
+                  <span class="d-block small text-light">Sun (First)</span>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="symbol-option text-center" id="btn-moon" onclick="selectSymbol('O')">
+                  <div class="mb-2" id="icon-moon-select"></div>
+                  <span class="d-block small text-light">Moon (Second)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Engine Params -->
+          <div class="mb-4">
+            <label class="form-label text-uppercase small text-light opacity-75">AI Compute Time</label>
+            <select class="form-select form-select-dark" id="time-select">
+              <option value="0.5">Light Speed (0.5s)</option>
+              <option value="1.0" selected>Standard Orbit (1.0s)</option>
+              <option value="2.0">Deep Space (2.0s)</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label text-uppercase small text-light opacity-75">Engine Features</label>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="small">Transposition Table (Stage 2)</span>
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" id="use-tt" checked>
+              </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="small">Trap Detection (Stage 3)</span>
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" id="use-trap" checked>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-sun w-100 py-2 rounded-3" onclick="startGame()">Engage AI</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Game Area -->
+    <div id="game-area" class="row justify-content-center flex-grow-1 align-items-center" style="display: none !important;">
+      
+      <!-- Board -->
+      <div class="col-lg-7 mb-4 mb-lg-0">
+        <div class="board-wrapper">
+          <div id="board"></div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="col-lg-4">
+        <div class="d-flex flex-column gap-3">
+          
+          <!-- Status -->
+          <div class="glass-panel p-3">
+            <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3">Mission Status</h6>
+            <div class="d-flex align-items-center gap-3">
+              <div id="turn-icon" style="width: 32px; height: 32px;"></div>
+              <h5 class="m-0" id="status-msg">Your Orbit</h5>
+            </div>
+            <div id="thinking" class="mt-2 small text-info" style="display: none;">
+              AI is calculating trajectories...
+            </div>
+          </div>
+
+          <!-- Score -->
+          <div class="glass-panel p-3">
+            <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3">Galactic Score</h6>
+            <div class="row text-center g-2">
+              <div class="col-4">
+                <div class="p-2 rounded bg-dark bg-opacity-50 border border-secondary border-opacity-25">
+                  <div class="small opacity-75">Sun</div>
+                  <div class="fs-4 fw-bold" style="color: var(--color-sun);" id="score-sun">0</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="p-2 rounded bg-dark bg-opacity-50 border border-secondary border-opacity-25">
+                  <div class="small opacity-75">Draw</div>
+                  <div class="fs-4 fw-bold text-light" id="score-draw">0</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="p-2 rounded bg-dark bg-opacity-50 border border-secondary border-opacity-25">
+                  <div class="small opacity-75">Moon</div>
+                  <div class="fs-4 fw-bold" style="color: var(--color-moon);" id="score-moon">0</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Minimap & Badges -->
+          <div class="glass-panel p-3 text-center">
+             <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3 text-start">Sector Map</h6>
+             <div id="macro-mini" class="macro-mini-grid mb-3"></div>
+             <div id="stage-badges" class="d-flex flex-wrap justify-content-center gap-1"></div>
+          </div>
+
+          <!-- Controls -->
+          <div class="row g-2">
+            <div class="col-6">
+              <button class="btn btn-outline-light w-100" onclick="undoMove()">Undo Orbit</button>
+            </div>
+            <div class="col-6">
+              <button class="btn btn-outline-light w-100" onclick="reconfigure()">Abort</button>
+            </div>
+            <div class="col-12">
+              <button class="btn btn-cosmic w-100" onclick="newGameSameSettings()">New Simulation</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Result Overlay -->
+    <div id="result-overlay" class="result-overlay">
+      <div class="result-card">
+        <div id="result-icon" style="width: 80px; height: 80px; margin: 0 auto 1rem;"></div>
+        <h2 id="result-title" class="fw-bold mb-2">Victory!</h2>
+        <p id="result-sub" class="text-light opacity-75 mb-4">The galaxy is yours.</p>
+        <div class="d-grid gap-2">
+          <button class="btn btn-sun py-2" onclick="newGameSameSettings()">Play Again</button>
+          <button class="btn btn-outline-light" onclick="reconfigure()">Settings</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    /* ═══════════════════════════════════════════════════════
+       Celestial SVGs
+       ═══════════════════════════════════════════════════════ */
+    function sunSVG(size = '100%') {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="5" fill="rgba(255,215,0,0.2)" stroke="var(--color-sun)" stroke-width="2" filter="drop-shadow(0 0 4px var(--glow-sun))"/>
+        <line x1="12" y1="1" x2="12" y2="4" stroke="var(--color-sun)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="12" y1="20" x2="12" y2="23" stroke="var(--color-sun)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="4.22" y1="4.22" x2="6.34" y2="6.34" stroke="var(--color-sun)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="17.66" y1="17.66" x2="19.78" y2="19.78" stroke="var(--color-sun)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="1" y1="12" x2="4" y2="12" stroke="var(--color-sun)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="20" y1="12" x2="23" y2="12" stroke="var(--color-sun)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="4.22" y1="19.78" x2="6.34" y2="17.66" stroke="var(--color-sun)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="17.66" y1="6.34" x2="19.78" y2="4.22" stroke="var(--color-sun)" stroke-width="2" stroke-linecap="round"/>
+      </svg>`;
+    }
+
+    function moonSVG(size = '100%') {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="rgba(135, 206, 250, 0.2)" xmlns="http://www.w3.org/2000/svg">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="var(--color-moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" filter="drop-shadow(0 0 4px var(--glow-moon))"/>
+      </svg>`;
+    }
+
+    function starSVG(size = '100%') {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="rgba(169,169,169,0.2)" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" stroke="var(--color-draw)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+    }
+
+    // Insert setup SVGs
+    document.getElementById('icon-sun-select').innerHTML = sunSVG('48px');
+    document.getElementById('icon-moon-select').innerHTML = moonSVG('48px');
+
+    /* Client state management */
+    let gameId = null;
+    let humanSym = 'X'; // X = Sun, O = Moon
+    let scores = { X: 0, O: 0, D: 0 };
+    let busy = false;
+    window._lastState = null;
+
+    function selectSymbol(sym) {
+      humanSym = sym;
+      const btnSun = document.getElementById('btn-sun');
+      const btnMoon = document.getElementById('btn-moon');
+      if (sym === 'X') {
+        btnSun.className = 'symbol-option active-sun text-center';
+        btnMoon.className = 'symbol-option text-center';
+      } else {
+        btnSun.className = 'symbol-option text-center';
+        btnMoon.className = 'symbol-option active-moon text-center';
+      }
+    }
+
+    async function startGame() {
+      const timeLimit = parseFloat(document.getElementById('time-select').value);
+      const useTT = document.getElementById('use-tt').checked;
+      const useTrap = document.getElementById('use-trap').checked;
+
+      document.getElementById('setup-panel').classList.remove('d-flex');
+      document.getElementById('setup-panel').style.setProperty('display', 'none', 'important');
+      document.getElementById('game-area').style.setProperty('display', 'flex', 'important');
+      
+      updateStageBadges(useTT, useTrap);
+
+      const resp = await fetch('/api/new_game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ human_symbol: humanSym, time_limit: timeLimit, use_tt: useTT, use_trap: useTrap })
+      });
+      const data = await resp.json();
+      gameId = data.game_id;
+      window._lastState = data.state;
+      renderBoard(data.state);
+      updateStatus(data.state);
+    }
+
+    function renderBoard(state) {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      const am = state.active_macro;
+      const vm = new Set(state.valid_moves);
+
+      for (let m = 0; m < 9; m++) {
+        const sb = document.createElement('div');
+        sb.className = 'small-board';
+        const ms = state.macro[m];
+
+        if (ms) {
+          const overlay = document.createElement('div');
+          if (ms === 'X') {
+            overlay.className = 'macro-overlay won-sun';
+            overlay.innerHTML = sunSVG('60%');
+          } else if (ms === 'O') {
+            overlay.className = 'macro-overlay won-moon';
+            overlay.innerHTML = moonSVG('60%');
+          } else {
+            overlay.className = 'macro-overlay won-draw';
+            overlay.innerHTML = starSVG('60%');
+          }
+          sb.appendChild(overlay);
+        } else {
+          const isActive = (am === null || am === m);
+          if (isActive) {
+            sb.classList.add(state.turn === 'X' ? 'active-sun' : 'active-moon');
+          } else {
+            sb.classList.add('inactive');
+          }
+        }
+
+        for (let l = 0; l < 9; l++) {
+          const pos = m * 9 + l;
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          
+          const val = state.cells[pos];
+          if (val) {
+            cell.innerHTML = val === 'X' ? sunSVG() : moonSVG();
+          }
+          
+          if (state.prev_move === pos) {
+            cell.classList.add('last-move');
+          }
+          
+          const canPlay = !state.terminal && vm.has(pos) && state.turn === humanSym && !busy;
+          if (canPlay) {
+            cell.classList.add('playable');
+            cell.classList.add(humanSym === 'X' ? 'sun-hover' : 'moon-hover');
+            cell.onclick = () => playMove(pos);
+          }
+          sb.appendChild(cell);
+        }
+        board.appendChild(sb);
+      }
+      updateMacroMini(state, am);
+    }
+
+    function updateMacroMini(state, am) {
+      const el = document.getElementById('macro-mini');
+      el.innerHTML = '';
+      for (let m = 0; m < 9; m++) {
+        const c = document.createElement('div');
+        c.className = 'mini-cell';
+        const ms = state.macro[m];
+        
+        if (ms === 'X') { c.classList.add('sun-won'); c.innerHTML = sunSVG('60%'); } 
+        else if (ms === 'O') { c.classList.add('moon-won'); c.innerHTML = moonSVG('60%'); } 
+        else if (ms === 'D') { c.classList.add('draw-won'); c.innerHTML = starSVG('60%'); }
+        
+        if (!ms && (am === null || am === m)) {
+          c.classList.add('active-mini');
+        }
+        el.appendChild(c);
+      }
+    }
+
+    function updateStatus(state) {
+      const icon = document.getElementById('turn-icon');
+      const msg = document.getElementById('status-msg');
+      const thinking = document.getElementById('thinking');
+      
+      if (state.terminal) return;
+
+      icon.innerHTML = state.turn === 'X' ? sunSVG() : moonSVG();
+
+      if (state.turn === humanSym) {
+        msg.textContent = 'Your Orbit';
+        thinking.style.display = 'none';
+      } else {
+        msg.textContent = 'AI Calculation';
+        thinking.style.display = 'block';
+      }
+    }
+
+    async function playMove(pos) {
+      if (busy || !gameId) return;
+      busy = true;
+      document.getElementById('thinking').style.display = 'block';
+      
+      if (window._lastState) {
+        renderBoard({ ...window._lastState, valid_moves: [] });
+      }
+
+      const resp = await fetch('/api/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game_id: gameId, pos })
+      });
+      const data = await resp.json();
+      busy = false;
+
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+      
+      window._lastState = data.state;
+      renderBoard(data.state);
+      updateStatus(data.state);
+      
+      if (data.state.terminal) {
+        handleResult(data.state.terminal);
+      }
+    }
+
+    function handleResult(result) {
+      scores[result]++;
+      document.getElementById('score-sun').textContent = scores.X;
+      document.getElementById('score-moon').textContent = scores.O;
+      document.getElementById('score-draw').textContent = scores.D;
+
+      const iconEl = document.getElementById('result-icon');
+      const title = document.getElementById('result-title');
+      const sub = document.getElementById('result-sub');
+
+      if (result === 'D') {
+        iconEl.innerHTML = starSVG();
+        title.textContent = 'Galactic Tie';
+        title.style.color = 'var(--color-draw)';
+        sub.textContent = 'A celestial gridlock.';
+      } else {
+        const isHuman = result === humanSym;
+        iconEl.innerHTML = result === 'X' ? sunSVG() : moonSVG();
+        title.textContent = isHuman ? 'Victory!' : 'System Failure';
+        title.style.color = result === 'X' ? 'var(--color-sun)' : 'var(--color-moon)';
+        sub.textContent = isHuman ? 'You have conquered the galaxy.' : 'The AI outmaneuvered you.';
+      }
+      
+      document.getElementById('result-overlay').classList.add('show');
+    }
+
+    function updateStageBadges(tt, trap) {
+      const container = document.getElementById('stage-badges');
+      container.innerHTML = `
+        <span class="badge bg-secondary">MCTS</span>
+        <span class="badge ${tt ? 'bg-primary' : 'bg-dark border'}">TransTable</span>
+        <span class="badge ${trap ? 'bg-info' : 'bg-dark border'}">Traps</span>
+      `;
+    }
+
+    async function undoMove() {
+      if (!gameId || busy) return;
+      const resp = await fetch('/api/undo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game_id: gameId })
+      });
+      const data = await resp.json();
+      if (data.error) return;
+      
+      window._lastState = data.state;
+      renderBoard(data.state);
+      updateStatus(data.state);
+    }
+
+    async function newGameSameSettings() {
+      document.getElementById('result-overlay').classList.remove('show');
+      await startGame();
+    }
+
+    function reconfigure() {
+      document.getElementById('result-overlay').classList.remove('show');
+      document.getElementById('game-area').style.setProperty('display', 'none', 'important');
+      document.getElementById('setup-panel').style.setProperty('display', 'flex', 'important');
+      gameId = null;
+      busy = false;
+    }
+
+    selectSymbol('X');
+  </script>
+</body>
+</html>
