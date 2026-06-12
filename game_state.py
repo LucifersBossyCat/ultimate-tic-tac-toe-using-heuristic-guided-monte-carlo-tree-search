@@ -4,10 +4,11 @@ import random as _random
 WIN_LINES = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),(1,4,7),(2,5,8),(0,4,8),(2,4,6)]
 OPPONENT  = {'X': 'O', 'O': 'X'}
 
-# Zobrist tables (generated once at import)
-_rng = _random.Random(0xDEADBEEF)          # fixed seed → reproducible
+# Zobrist tables setup
+# hardcoding the seed. debugging non-deterministic tree traverses is a nightmare.
+_rng = _random.Random(0xDEADBEEF)         
 ZOBRIST_CELLS = [[_rng.getrandbits(64) for _ in range(2)] for _ in range(81)]
-ZOBRIST_TURN  = _rng.getrandbits(64)       # XOR-in when it is O's turn
+ZOBRIST_TURN  = _rng.getrandbits(64)       
 SYM_IDX       = {'X': 0, 'O': 1}
 
 
@@ -27,10 +28,9 @@ class GameState:
         self.macro     = [None] * 9
         self.prev_move = None
         self.turn      = 'X'
-        self.zobrist   = 0          # X moves first → no turn token initially
+        self.zobrist   = 0          
 
-    # Core helpers
-
+   
     def _macro_cells(self, m):
         base = m * 9
         return self.cells[base:base + 9]
@@ -44,13 +44,12 @@ class GameState:
             self.macro[m] = 'D'
 
     def active_macro(self):
-        """Return the macro index the current player must play in, or None for free choice."""
+        # returns the sub-board index the player is forced into, or None if they can play anywhere
         if self.prev_move is None:
             return None
         target = self.prev_move % 9
         return None if self.macro[target] else target
 
-    # Move generation
 
     def valid_moves(self):
         am = self.active_macro()
@@ -66,34 +65,30 @@ class GameState:
                     moves.append(base + l)
         return moves
 
-    # State transition — immutable; returns a new GameState
 
     def play(self, pos):
+        # copying arrays directly instead of deepcopying the whole object to keep node expansion fast
         g            = GameState()
         g.cells      = self.cells[:]
         g.macro      = self.macro[:]
         g.prev_move  = pos
         g.turn       = OPPONENT[self.turn]
 
-        # Place the piece
         g.cells[pos] = self.turn
         g._recompute_macro(pos // 9)
 
-        # Incremental Zobrist update
-        # 1. XOR out the old turn token (if O was to move)
-        # 2. XOR in the new cell token
-        # 3. XOR in the new turn token (if O is now to move)
+        # incremental hash update. 
+        # flipping the turn token and new cell token directly so we don't have to re-hash the whole board.
         h = self.zobrist
         if self.turn == 'O':
-            h ^= ZOBRIST_TURN              # remove "O to move" token
+            h ^= ZOBRIST_TURN              
         h ^= ZOBRIST_CELLS[pos][SYM_IDX[self.turn]]
         if g.turn == 'O':
-            h ^= ZOBRIST_TURN              # add "O to move" token
+            h ^= ZOBRIST_TURN  
         g.zobrist = h
 
         return g
 
-    # Terminal check
 
     def terminal(self):
         """Returns 'X', 'O', 'D', or None."""
@@ -104,9 +99,9 @@ class GameState:
             return 'D'
         return None
 
-    # Display
 
     def display(self):
+        # CLI visualizer (mostly just for my own sanity checking during development)
         try:
             from colorama import Fore, Style, init
             init(autoreset=True)
