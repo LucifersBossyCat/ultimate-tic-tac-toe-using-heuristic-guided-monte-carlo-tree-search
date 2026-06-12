@@ -1,48 +1,97 @@
 ## ultimate-tic-tac-toe-using-heuristic-guided-monte-carlo-tree-search
 
-A fully playable **Ultimate Tic-Tac-Toe** game featuring a space-themed web UI. 
+A playable **Ultimate Tic-Tac-Toe** game featuring a custom space-themed web UI and an experimental **Heuristic-Guided Monte Carlo Tree Search (HG-MCTS)** agent.
 
-At its core runs a custom, three-stage **Heuristic-Guided Monte Carlo Tree Search (HG-MCTS)** AI engine designed to navigate the massive state space of Ultimate Tic-Tac-Toe.
+This project explores the use of heuristic-guided search, transposition-table caching, and tactical pattern detection in Ultimate Tic-Tac-Toe. The AI is currently under active development and should be considered an experimental implementation rather than a strong or fully optimized engine.
 
 ![Home](home.png)
 
 ---
+
+## Project Status
+
+⚠️ **Work in Progress**
+
+The current HG-MCTS agent is capable of playing complete games and demonstrates basic tactical behavior. However, its playing strength remains limited, and it frequently makes suboptimal strategic decisions.
+
+This repository focuses on experimenting with search enhancements and evaluation techniques rather than achieving competitive-level play.
+
+---
+
 ## What is Ultimate Tic-Tac-Toe?
 
-Ultimate Tic-Tac-Toe is a meta-game played on a 9×9 grid divided into nine 3×3 small "macro" boards.
-- Each move you make sends your opponent to a specific small board. (e.g., Playing in the top-right cell of a small board forces your opponent to play their next move in the top-right macro board).
-- Win three small boards in a row on the global 3×3 macro grid to win the game.
-- If a player is forced into a small board that is already won or full, they earn a "Free Choice" and may play anywhere on the board.
+Ultimate Tic-Tac-Toe is a meta-game played on a 9×9 grid divided into nine 3×3 small boards.
+
+- Each move determines which small board the opponent must play in next.
+- Winning a small board claims that position on the macro board.
+- Win three claimed boards in a row on the macro board to win the game.
+- If sent to a completed board, the player may choose any available board.
 
 ![Game](game.png)
 
-## The AI Engine: 3-Stage HG-MCTS
+---
 
-Standard MCTS struggles with Ultimate Tic-Tac-Toe because early random rollouts rarely hit meaningful terminal states. This engine solves that using a heavily optimized three-stage architecture:
+## The AI Engine: Experimental 3-Stage HG-MCTS
+
+Traditional MCTS often struggles in Ultimate Tic-Tac-Toe because random rollouts rarely reach meaningful terminal positions. This project explores several techniques intended to improve search quality.
 
 | Stage | Name | Description |
 | :--- | :--- | :--- |
-| **Stage 1** | **HG-MCTS Base** | Replaces random rollout playouts with heuristic-guided rollouts (picking top 3 moves via a greedy epsilon). Cuts off early at depth 35. |
-| **Stage 2** | **Transposition Table** | Uses Zobrist Hashing to cache and reuse visits/wins across different move permutations and turns, holding up to 200k entries. |
-| **Stage 3** | **Trap Detection** | Fork-aware macro scoring. Heavily rewards moves that create two simultaneous macro threats (a fork) or block an opponent's fork. |
+| **Stage 1** | **HG-MCTS Base** | Uses heuristic-guided rollouts instead of purely random simulations and applies an early rollout cutoff. |
+| **Stage 2** | **Transposition Table** | Uses Zobrist hashing to cache previously evaluated positions and reduce redundant search effort. |
+| **Stage 3** | **Trap Detection** | Experimental fork-detection heuristics that attempt to identify macro-board threats and defensive responses. |
 
-### Deep Dive: Heuristic Scoring & Trap Detection
-The AI evaluates non-terminal board states using a weighted point system. Stage 1 handles tactical and positional advantages, while Stage 3 specifically looks for game-ending macro forks.
+The effectiveness of these techniques is still being evaluated and tuned.
 
-**`Score(move)` Weight Breakdown:**
-* `+100` : Immediate small-board win
-* `+80`  : **[Stage 3]** Create a macro-board fork (2 winning threats)
-* `+60`  : Block opponent's small-board win
-* `+50`  : **[Stage 3]** Block an opponent's macro-board fork
-* `+40`  : **[Stage 3]** Create a triple threat (≥3 lines threatened)
-* `+25`  : Create a 2-in-a-row on the macro board
-* `+18`  : Send opponent into a finished macro (forcing them to play freely is less ideal, but winning the board to enforce the constraint is rewarded)
-* `+15`  : Create a 2-in-a-row inside a small board
-* `+12`  : Play in the center cell of a small board
-* `+8`   : Win the center macro board
-* `+6`   : Play in a corner cell of a small board
-* `+3`   : Win a corner macro board
+---
+## Current Limitations
 
-### Installation
+- Heuristic weights are manually tuned and remain experimental.
+- The agent can miss important long-term strategic opportunities.
+- Tactical pattern recognition is limited.
+- Search quality varies significantly between positions.
+
+---
+
+## Alternative Implementation
+
+For a stronger baseline implementation, see:
+
+🔗 https://github.com/LucifersBossyCat/UTTT-using-minimax-and-alpha-beta-pruning
+
+The HG-MCTS agent in this repository is still experimental and often makes poor strategic decisions. The Minimax + Alpha-Beta version currently performs more consistently and is being used as a reference point while further improvements to HG-MCTS are explored.
+
+---
+
+## Experimental Evaluation Heuristics
+
+The AI evaluates non-terminal positions using a weighted heuristic system that prioritizes tactical and positional patterns such as:
+
+- Immediate local-board wins
+- Blocking opponent wins
+- Macro-board progress
+- Center and corner control
+- Potential fork creation
+- Potential fork prevention
+
+The scoring weights are still under development and may change as the project evolves.
+
+---
+
+## Future Improvements
+
+- Improved board evaluation functions
+- Stronger tactical pattern recognition
+- Better rollout policies
+- Automated parameter tuning
+- Benchmarking against alternative approaches
+- Performance optimization and profiling
+
+---
+
+## Installation
+
 1. Clone the repository:
-   https://github.com/LucifersBossyCat/ultimate-tic-tac-toe-using-heuristic-guided-monte-carlo-tree-search.git
+
+```bash
+git clone https://github.com/LucifersBossyCat/ultimate-tic-tac-toe-using-heuristic-guided-monte-carlo-tree-search.git
