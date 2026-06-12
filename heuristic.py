@@ -1,12 +1,8 @@
-"""
-heuristic.py — Move scoring and board evaluation for HG-MCTS
-
-"""
+# heuristic.py
+# Move scoring and board evaluation for the MCTS rollouts.
 
 from game_state import WIN_LINES, OPPONENT, check_winner
 
-
-# base move scoring 
 
 def score_move(state, pos: int, use_trap: bool = True) -> float:
     m   = pos // 9
@@ -18,23 +14,21 @@ def score_move(state, pos: int, use_trap: bool = True) -> float:
     small     = state._macro_cells(m)[:]
     small[l]  = sym
 
-    # Immediate small-board win
     if check_winner(small) == sym:
         score += 100
 
-    # Block opponent small-board win
     small_opp    = state._macro_cells(m)[:]
     small_opp[l] = opp
     if check_winner(small_opp) == opp:
         score += 60
 
-    # Two-in-a-row inside the small board
+    # two-in-a-row inside the local board
     for a, b, c in WIN_LINES:
         trio = [small[a], small[b], small[c]]
         if trio.count(sym) == 2 and trio.count(None) == 1:
             score += 15
 
-    # Two-in-a-row on the macro board
+    # two-in-a-row on the global macro board
     projected_macro = state.macro[:]
     if check_winner(small) == sym:
         projected_macro[m] = sym
@@ -43,37 +37,29 @@ def score_move(state, pos: int, use_trap: bool = True) -> float:
         if trio.count(sym) == 2 and trio.count(None) == 1:
             score += 25
 
-    # Send opponent into a finished macro (they are forced to play freely, which is only a minor advantage — we reward the constraint itself)
+    # sending the opponent into a finished macro gives them a free move anywhere. 
+    # fixed the sign flip issue here. took way too long to realize it was just a +18 that needed to be a -8.
+    # the +18 was literally rewarding the AI for handing the opponent a free turn.
     target = l
     if state.macro[target]:
-        score += 18
+        score -= 8
 
-    # Positional bonuses (local)
-    if l == 4:               score += 12   # center cell
-    if l in (0, 2, 6, 8):   score += 6    # corner cell
+    # local center/corner preference
+    if l == 4:               score += 12   
+    if l in (0, 2, 6, 8):    score += 6    
 
-    # Macro-level positional bonus
-    if m == 4:               score += 8    # center macro
-    if m in (0, 2, 6, 8):   score += 3    # corner macro
+    # macro center/corner preference
+    if m == 4:               score += 8    
+    if m in (0, 2, 6, 8):    score += 3    
 
-    # trap detection
     if use_trap:
         score += trap_bonus(state, pos, sym)
 
     return score
 
 
-# trap detection
-#
-# Weights
-# ───────
-#   +80  creating a fork (two macro threats)
-#   +50  blocking opponent fork
-#   +40  creating a triple threat (≥3 lines threatened)
-
 def _count_macro_threats(macro_9: list, sym: str) -> int:
-    """Count lines that are (sym, sym, None) in any order."""
-    opp   = OPPONENT[sym]
+    # counts active two-in-a-row lines on the global board
     count = 0
     for a, b, c in WIN_LINES:
         trio = [macro_9[a], macro_9[b], macro_9[c]]
@@ -83,55 +69,44 @@ def _count_macro_threats(macro_9: list, sym: str) -> int:
 
 
 def trap_bonus(state, pos: int, sym: str) -> float:
-    """
-    Return an additional score for moves that create or destroy macro forks.
-    Called by score_move(); can also be called standalone.
-    """
+    # evaluates if a move creates or blocks a macro fork.
     m   = pos // 9
     opp = OPPONENT[sym]
 
-    # Project macro state after this move
     small_after = state._macro_cells(m)[:]
     small_after[pos % 9] = sym
     macro_after = state.macro[:]
     if check_winner(small_after) == sym:
         macro_after[m] = sym
 
-    # Count threats before and after for both players
     threats_before = _count_macro_threats(state.macro, sym)
     threats_after  = _count_macro_threats(macro_after, sym)
     new_threats    = threats_after - threats_before
 
     opp_threats_before = _count_macro_threats(state.macro, opp)
-    # Simulate what the opponent would have had without this blocking move (we only block if we win macro m, removing it from their attack surface)
     opp_threats_after  = _count_macro_threats(macro_after, opp)
     blocked_opp        = max(0, opp_threats_before - opp_threats_after)
 
     bonus = 0.0
     if threats_after >= 3:
-        bonus += 40     # triple threat — very strong position
+        bonus += 40     # triple threat
     elif new_threats >= 2:
         bonus += 80     # created a fork
     elif new_threats == 1 and threats_after >= 2:
         bonus += 40     # extended an existing fork
     elif new_threats == 1:
-        bonus += 20     # opened one new line
+        bonus += 20     
 
     if blocked_opp >= 2:
         bonus += 50     # broke opponent fork
     elif blocked_opp == 1:
-        bonus += 15     # closed one opponent threat
+        bonus += 15     
 
     return bonus
 
 
-# Board evaluation (used for early rollout cutoff) 
-
 def board_eval(state, ai_sym: str) -> float:
-    """
-    Lightweight terminal-approximation.  Returns a value in [-1, +1].
-    Incorporates macro ownership, two-in-a-row patterns, and trap count.
-    """
+    # lightweight terminal approximation for early rollout cutoff.
     opp = OPPONENT[ai_sym]
     val = 0.0
 
@@ -139,11 +114,11 @@ def board_eval(state, ai_sym: str) -> float:
         if ms == ai_sym:
             val += 0.40
             if i == 4:             val += 0.10
-            if i in (0,2,6,8):    val += 0.05
+            if i in (0,2,6,8):     val += 0.05
         elif ms == opp:
             val -= 0.40
             if i == 4:             val -= 0.10
-            if i in (0,2,6,8):    val -= 0.05
+            if i in (0,2,6,8):     val -= 0.05
 
     for a, b, c in WIN_LINES:
         trio = [state.macro[a], state.macro[b], state.macro[c]]
@@ -152,8 +127,8 @@ def board_eval(state, ai_sym: str) -> float:
         if trio.count(opp) == 2 and trio.count(None) == 1:
             val -= 0.30
 
-    # Trap component (normalised — each fork worth ~0.15)
     val += _count_macro_threats(state.macro, ai_sym)  * 0.05
     val -= _count_macro_threats(state.macro, opp)     * 0.05
 
+    # clamping to [-1.0, 1.0] so the math doesn't blow up downstream
     return max(-1.0, min(1.0, val))
