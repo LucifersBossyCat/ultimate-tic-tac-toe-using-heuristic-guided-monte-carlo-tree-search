@@ -1,6 +1,5 @@
-"""
-app.py — Flask web server for Ultimate Tic-Tac-Toe (Human vs HG-MCTS AI)
-"""
+# app.py
+# Flask routing and session handling for the UTTT engine.
 
 import json
 import threading
@@ -11,7 +10,8 @@ from hg_mcts import HGMCTS, TranspositionTable
 app = Flask(__name__)
 app.secret_key = 'uttt-hgmcts-secret'
 
-# Global game state (per session via session id)
+# mapping session IDs to game instances. 
+# using a global dict + lock here instead of a DB just to keep the setup light.
 games = {}
 games_lock = threading.Lock()
 
@@ -71,7 +71,7 @@ def new_game():
 
     response = {'game_id': game_id, 'state': state_to_dict(state), 'human_sym': human_sym}
 
-    # If AI goes first (human is O), make the AI move immediately
+    # if AI goes first, generate its move before returning the initial board
     if human_sym == 'O':
         ai_move  = ai.get_move(state)
         state    = state.play(ai_move)
@@ -97,7 +97,6 @@ def make_move():
     if pos not in state.valid_moves():
         return jsonify({'error': 'Invalid move'}), 400
 
-    # Human move
     state = state.play(pos)
     game['history'].append(pos)
     game['state'] = state
@@ -108,7 +107,6 @@ def make_move():
         'ai_move':    None,
     }
 
-    # AI move (if game not over)
     if not state.terminal():
         ai      = game['ai']
         ai_move = ai.get_move(state)
@@ -128,7 +126,8 @@ def undo():
     if not game or len(game['history']) < 2:
         return jsonify({'error': 'Nothing to undo'}), 400
 
-    # Replay from scratch minus last 2 moves (human + ai)
+    # dropping the last ply (human + AI) and replaying history.
+    # much easier than writing a reverse state transition for this board.
     history = game['history'][:-2]
     state   = GameState()
     for m in history:
