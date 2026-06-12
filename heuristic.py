@@ -6,7 +6,7 @@ heuristic.py — Move scoring and board evaluation for HG-MCTS
 from game_state import WIN_LINES, OPPONENT, check_winner
 
 
-# Stage 1: base move scoring 
+# base move scoring 
 
 def score_move(state, pos: int, use_trap: bool = True) -> float:
     m   = pos // 9
@@ -18,23 +18,23 @@ def score_move(state, pos: int, use_trap: bool = True) -> float:
     small     = state._macro_cells(m)[:]
     small[l]  = sym
 
-    # 1. Immediate small-board win
+    # Immediate small-board win
     if check_winner(small) == sym:
         score += 100
 
-    # 2. Block opponent small-board win
+    # Block opponent small-board win
     small_opp    = state._macro_cells(m)[:]
     small_opp[l] = opp
     if check_winner(small_opp) == opp:
         score += 60
 
-    # 3. Two-in-a-row inside the small board
+    # Two-in-a-row inside the small board
     for a, b, c in WIN_LINES:
         trio = [small[a], small[b], small[c]]
         if trio.count(sym) == 2 and trio.count(None) == 1:
             score += 15
 
-    # 4. Two-in-a-row on the macro board
+    # Two-in-a-row on the macro board
     projected_macro = state.macro[:]
     if check_winner(small) == sym:
         projected_macro[m] = sym
@@ -43,28 +43,27 @@ def score_move(state, pos: int, use_trap: bool = True) -> float:
         if trio.count(sym) == 2 and trio.count(None) == 1:
             score += 25
 
-    # 5. Send opponent into a finished macro (they are forced to play freely,
-    #    which is only a minor advantage — we reward the constraint itself)
+    # Send opponent into a finished macro (they are forced to play freely, which is only a minor advantage — we reward the constraint itself)
     target = l
     if state.macro[target]:
         score += 18
 
-    # 6. Positional bonuses (local)
+    # Positional bonuses (local)
     if l == 4:               score += 12   # center cell
     if l in (0, 2, 6, 8):   score += 6    # corner cell
 
-    # 7. Macro-level positional bonus
+    # Macro-level positional bonus
     if m == 4:               score += 8    # center macro
     if m in (0, 2, 6, 8):   score += 3    # corner macro
 
-    # 8. Stage 3 — trap detection
+    # trap detection
     if use_trap:
         score += trap_bonus(state, pos, sym)
 
     return score
 
 
-# Stage 3: trap detection
+# trap detection
 #
 # Weights
 # ───────
@@ -104,8 +103,7 @@ def trap_bonus(state, pos: int, sym: str) -> float:
     new_threats    = threats_after - threats_before
 
     opp_threats_before = _count_macro_threats(state.macro, opp)
-    # Simulate what the opponent would have had without this blocking move
-    # (we only block if we win macro m, removing it from their attack surface)
+    # Simulate what the opponent would have had without this blocking move (we only block if we win macro m, removing it from their attack surface)
     opp_threats_after  = _count_macro_threats(macro_after, opp)
     blocked_opp        = max(0, opp_threats_before - opp_threats_after)
 
