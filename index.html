@@ -3,26 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Celestial Tic‑Tac‑Toe · HG‑MCTS</title>
+  <title>Ultimate Tic-Tac-Toe | MCTS</title>
   
-  <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  
-  <!-- Google Fonts: Space Grotesk -->
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   
   <style>
-    /* ═══════════════════════════════════════════════════════
-       Celestial Space Theme
-       ═══════════════════════════════════════════════════════ */
+    /* Theme: Dark Mode with Cosmic Vibes */
     :root {
       --bg-space: #050814;
       --surface-glass: rgba(16, 22, 38, 0.7);
       --border-glass: rgba(255, 255, 255, 0.1);
       
-      --color-sun: #FFD700;      /* Golden Sun */
-      --color-moon: #87CEFA;     /* Silver/Blue Moon */
-      --color-draw: #A9A9A9;     /* Stardust Gray */
+      --color-sun: #FFD700;      
+      --color-moon: #87CEFA;     
+      --color-draw: #A9A9A9;     
       
       --glow-sun: rgba(255, 215, 0, 0.5);
       --glow-moon: rgba(135, 206, 250, 0.5);
@@ -39,7 +34,7 @@
       overflow-x: hidden;
     }
 
-    /* CSS Starfield Background */
+    /* background drift. z-index -2 so it doesn't swallow my click events. */
     .starfield {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -69,7 +64,6 @@
       to { background-position: -200px 200px; }
     }
 
-    /* Glass UI Elements */
     .glass-panel {
       background: var(--surface-glass);
       backdrop-filter: blur(12px);
@@ -87,7 +81,7 @@
       text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
     }
 
-    /* Setup Options */
+    /* config form toggles */
     .symbol-option {
       background: rgba(255, 255, 255, 0.05);
       border: 2px solid transparent;
@@ -113,7 +107,6 @@
       box-shadow: 0 0 20px var(--glow-moon);
     }
 
-    /* Form Controls */
     .form-select-dark {
       background-color: rgba(0, 0, 0, 0.5);
       border: 1px solid var(--border-glass);
@@ -136,7 +129,7 @@
       box-shadow: 0 0 10px var(--glow-sun);
     }
 
-    /* Board & Grids */
+    /* game grids */
     .board-wrapper {
       aspect-ratio: 1;
       width: 100%;
@@ -169,7 +162,6 @@
       transition: all 0.3s ease;
     }
 
-    /* Orbit Highlights */
     .small-board.active-sun {
       border-color: var(--color-sun);
       box-shadow: 0 0 15px var(--glow-sun), inset 0 0 10px rgba(255, 215, 0, 0.1);
@@ -183,7 +175,7 @@
       filter: grayscale(0.5);
     }
 
-    /* Macro Win Overlays */
+    /* sub-board win overlays */
     .macro-overlay {
       position: absolute;
       inset: 0;
@@ -199,7 +191,6 @@
     .macro-overlay.won-moon { background: rgba(135, 206, 250, 0.15); border: 2px solid var(--color-moon); }
     .macro-overlay.won-draw { background: rgba(169, 169, 169, 0.15); border: 2px solid var(--color-draw); }
 
-    /* Cells */
     .cell {
       background: rgba(255, 255, 255, 0.03);
       border-radius: 6px;
@@ -221,7 +212,7 @@
       to { transform: scale(1); opacity: 1; }
     }
 
-    /* Sidebar Minimap */
+    /* minimap sidebar */
     .macro-mini-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -243,7 +234,6 @@
     .mini-cell.draw-won { background: rgba(169, 169, 169, 0.3); }
     .mini-cell.active-mini { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
 
-    /* Buttons */
     .btn-cosmic {
       background: linear-gradient(45deg, #1e3a8a, #312e81);
       color: #fff;
@@ -264,7 +254,6 @@
     }
     .btn-sun:hover { background: #e6c200; box-shadow: 0 0 15px var(--glow-sun); }
 
-    /* Custom Result Modal */
     .result-overlay {
       position: fixed; inset: 0;
       background: rgba(0, 0, 0, 0.85);
@@ -288,107 +277,97 @@
 </head>
 <body>
 
-  <!-- Ambient Background -->
   <div class="starfield"></div>
   <div class="nebula"></div>
 
   <div class="container py-4 d-flex flex-column min-vh-100">
     
-    <!-- Header -->
     <header class="text-center mb-4">
-      <h1 class="title-glow">Celestial Tic‑Tac‑Toe</h1>
-      <p class="text-uppercase tracking-wider small text-light opacity-75">HG‑MCTS Engine</p>
+      <h1 class="title-glow">Ultimate Tic-Tac-Toe</h1>
+      <p class="text-uppercase tracking-wider small text-light opacity-75">MCTS Engine UI</p>
     </header>
 
-    <!-- 1. Setup Panel -->
     <div id="setup-panel" class="row justify-content-center flex-grow-1 align-items-center">
       <div class="col-12 col-md-6 col-lg-5">
         <div class="glass-panel p-4">
-          <h4 class="text-center mb-4">Launch Coordinates</h4>
+          <h4 class="text-center mb-4">Game Settings</h4>
           
-          <!-- Symbol Selector -->
           <div class="mb-4">
-            <label class="form-label text-uppercase small text-light opacity-75">Select Celestial Body</label>
+            <label class="form-label text-uppercase small text-light opacity-75">Select Player</label>
             <div class="row g-3">
               <div class="col-6">
                 <div class="symbol-option active-sun text-center" id="btn-sun" onclick="selectSymbol('X')">
                   <div class="mb-2" id="icon-sun-select"></div>
-                  <span class="d-block small text-light">Sun (First)</span>
+                  <span class="d-block small text-light">P1 (First)</span>
                 </div>
               </div>
               <div class="col-6">
                 <div class="symbol-option text-center" id="btn-moon" onclick="selectSymbol('O')">
                   <div class="mb-2" id="icon-moon-select"></div>
-                  <span class="d-block small text-light">Moon (Second)</span>
+                  <span class="d-block small text-light">P2 (Second)</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Engine Params -->
           <div class="mb-4">
             <label class="form-label text-uppercase small text-light opacity-75">AI Compute Time</label>
             <select class="form-select form-select-dark" id="time-select">
-              <option value="0.5">Light Speed (0.5s)</option>
-              <option value="1.0" selected>Standard Orbit (1.0s)</option>
-              <option value="2.0">Deep Space (2.0s)</option>
+              <option value="0.5">Fast (0.5s)</option>
+              <option value="1.0" selected>Standard (1.0s)</option>
+              <option value="2.0">Deep Search (2.0s)</option>
             </select>
           </div>
 
           <div class="mb-4">
             <label class="form-label text-uppercase small text-light opacity-75">Engine Features</label>
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="small">Transposition Table (Stage 2)</span>
+              <span class="small">Transposition Table</span>
               <div class="form-check form-switch m-0">
                 <input class="form-check-input" type="checkbox" id="use-tt" checked>
               </div>
             </div>
             <div class="d-flex justify-content-between align-items-center">
-              <span class="small">Trap Detection (Stage 3)</span>
+              <span class="small">Trap Detection Heuristics</span>
               <div class="form-check form-switch m-0">
                 <input class="form-check-input" type="checkbox" id="use-trap" checked>
               </div>
             </div>
           </div>
 
-          <button class="btn btn-sun w-100 py-2 rounded-3" onclick="startGame()">Engage AI</button>
+          <button class="btn btn-sun w-100 py-2 rounded-3" onclick="startGame()">Start Engine</button>
         </div>
       </div>
     </div>
 
-    <!-- 2. Game Area -->
     <div id="game-area" class="row justify-content-center flex-grow-1 align-items-center" style="display: none !important;">
       
-      <!-- Board -->
       <div class="col-lg-7 mb-4 mb-lg-0">
         <div class="board-wrapper">
           <div id="board"></div>
         </div>
       </div>
 
-      <!-- Sidebar -->
       <div class="col-lg-4">
         <div class="d-flex flex-column gap-3">
           
-          <!-- Status -->
           <div class="glass-panel p-3">
-            <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3">Mission Status</h6>
+            <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3">Status</h6>
             <div class="d-flex align-items-center gap-3">
               <div id="turn-icon" style="width: 32px; height: 32px;"></div>
-              <h5 class="m-0" id="status-msg">Your Orbit</h5>
+              <h5 class="m-0" id="status-msg">Your Turn</h5>
             </div>
             <div id="thinking" class="mt-2 small text-info" style="display: none;">
-              AI is calculating trajectories...
+              AI is thinking...
             </div>
           </div>
 
-          <!-- Score -->
           <div class="glass-panel p-3">
-            <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3">Galactic Score</h6>
+            <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3">Score</h6>
             <div class="row text-center g-2">
               <div class="col-4">
                 <div class="p-2 rounded bg-dark bg-opacity-50 border border-secondary border-opacity-25">
-                  <div class="small opacity-75">Sun</div>
+                  <div class="small opacity-75">P1</div>
                   <div class="fs-4 fw-bold" style="color: var(--color-sun);" id="score-sun">0</div>
                 </div>
               </div>
@@ -400,30 +379,28 @@
               </div>
               <div class="col-4">
                 <div class="p-2 rounded bg-dark bg-opacity-50 border border-secondary border-opacity-25">
-                  <div class="small opacity-75">Moon</div>
+                  <div class="small opacity-75">P2</div>
                   <div class="fs-4 fw-bold" style="color: var(--color-moon);" id="score-moon">0</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Minimap & Badges -->
           <div class="glass-panel p-3 text-center">
-             <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3 text-start">Sector Map</h6>
+             <h6 class="text-uppercase small text-light opacity-75 border-bottom border-secondary pb-2 mb-3 text-start">Macro Board</h6>
              <div id="macro-mini" class="macro-mini-grid mb-3"></div>
              <div id="stage-badges" class="d-flex flex-wrap justify-content-center gap-1"></div>
           </div>
 
-          <!-- Controls -->
           <div class="row g-2">
             <div class="col-6">
-              <button class="btn btn-outline-light w-100" onclick="undoMove()">Undo Orbit</button>
+              <button class="btn btn-outline-light w-100" onclick="undoMove()">Undo Move</button>
             </div>
             <div class="col-6">
-              <button class="btn btn-outline-light w-100" onclick="reconfigure()">Abort</button>
+              <button class="btn btn-outline-light w-100" onclick="reconfigure()">Settings</button>
             </div>
             <div class="col-12">
-              <button class="btn btn-cosmic w-100" onclick="newGameSameSettings()">New Simulation</button>
+              <button class="btn btn-cosmic w-100" onclick="newGameSameSettings()">New Game</button>
             </div>
           </div>
 
@@ -431,12 +408,11 @@
       </div>
     </div>
 
-    <!-- 3. Result Overlay -->
     <div id="result-overlay" class="result-overlay">
       <div class="result-card">
         <div id="result-icon" style="width: 80px; height: 80px; margin: 0 auto 1rem;"></div>
         <h2 id="result-title" class="fw-bold mb-2">Victory!</h2>
-        <p id="result-sub" class="text-light opacity-75 mb-4">The galaxy is yours.</p>
+        <p id="result-sub" class="text-light opacity-75 mb-4">Good game.</p>
         <div class="d-grid gap-2">
           <button class="btn btn-sun py-2" onclick="newGameSameSettings()">Play Again</button>
           <button class="btn btn-outline-light" onclick="reconfigure()">Settings</button>
@@ -446,13 +422,10 @@
 
   </div>
 
-  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
-    /* ═══════════════════════════════════════════════════════
-       Celestial SVGs
-       ═══════════════════════════════════════════════════════ */
+    // inlining these SVGs directly so I don't have to fight with Flask's static folder routing.
     function sunSVG(size = '100%') {
       return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="12" cy="12" r="5" fill="rgba(255,215,0,0.2)" stroke="var(--color-sun)" stroke-width="2" filter="drop-shadow(0 0 4px var(--glow-sun))"/>
@@ -479,13 +452,11 @@
       </svg>`;
     }
 
-    // Insert setup SVGs
     document.getElementById('icon-sun-select').innerHTML = sunSVG('48px');
     document.getElementById('icon-moon-select').innerHTML = moonSVG('48px');
 
-    /* Client state management */
     let gameId = null;
-    let humanSym = 'X'; // X = Sun, O = Moon
+    let humanSym = 'X'; 
     let scores = { X: 0, O: 0, D: 0 };
     let busy = false;
     window._lastState = null;
@@ -615,7 +586,7 @@
       icon.innerHTML = state.turn === 'X' ? sunSVG() : moonSVG();
 
       if (state.turn === humanSym) {
-        msg.textContent = 'Your Orbit';
+        msg.textContent = 'Your Turn';
         thinking.style.display = 'none';
       } else {
         msg.textContent = 'AI Calculation';
@@ -666,15 +637,15 @@
 
       if (result === 'D') {
         iconEl.innerHTML = starSVG();
-        title.textContent = 'Galactic Tie';
+        title.textContent = 'Draw';
         title.style.color = 'var(--color-draw)';
-        sub.textContent = 'A celestial gridlock.';
+        sub.textContent = 'Board locked.';
       } else {
         const isHuman = result === humanSym;
         iconEl.innerHTML = result === 'X' ? sunSVG() : moonSVG();
-        title.textContent = isHuman ? 'Victory!' : 'System Failure';
+        title.textContent = isHuman ? 'Victory!' : 'Defeat';
         title.style.color = result === 'X' ? 'var(--color-sun)' : 'var(--color-moon)';
-        sub.textContent = isHuman ? 'You have conquered the galaxy.' : 'The AI outmaneuvered you.';
+        sub.textContent = isHuman ? 'Good game.' : 'The AI won.';
       }
       
       document.getElementById('result-overlay').classList.add('show');
